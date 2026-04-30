@@ -1,0 +1,269 @@
+[
+  {
+    "incident_id": "incident_a",
+    "summary": "Trading platform outage caused by long-running batch job triggering database connection pool exhaustion, leading to pricing service failure and complete trading halt. Root cause: missing database index on user_positions table causing full table scan.",
+    "timeline": [
+      {
+        "timestamp": "2024-03-15 14:02:11 UTC",
+        "phase": "normal",
+        "component": "api-gateway",
+        "event": "Baseline performance established",
+        "severity": "INFO",
+        "technical_detail": "p99 latency=120ms (baseline)"
+      },
+      {
+        "timestamp": "2024-03-15 14:08:44 UTC",
+        "phase": "degradation",
+        "component": "api-gateway",
+        "event": "Request latency degradation detected",
+        "severity": "WARN",
+        "technical_detail": "p99 latency increased to 340ms (2.8x baseline)"
+      },
+      {
+        "timestamp": "2024-03-15 14:09:01 UTC",
+        "phase": "degradation",
+        "component": "pricing-service",
+        "event": "Slow query detected",
+        "severity": "WARN",
+        "technical_detail": "query_id=q_4821 duration=2100ms"
+      },
+      {
+        "timestamp": "2024-03-15 14:09:15 UTC",
+        "phase": "degradation",
+        "component": "pricing-service",
+        "event": "Multiple slow queries occurring",
+        "severity": "WARN",
+        "technical_detail": "query_id=q_4822 duration=3400ms"
+      },
+      {
+        "timestamp": "2024-03-15 14:10:33 UTC",
+        "phase": "outage",
+        "component": "db-primary",
+        "event": "Database connection pool exhausted",
+        "severity": "ERROR",
+        "technical_detail": "pool_size=100, waiting=47 connections"
+      },
+      {
+        "timestamp": "2024-03-15 14:10:45 UTC",
+        "phase": "outage",
+        "component": "api-gateway",
+        "event": "Upstream service timeout",
+        "severity": "ERROR",
+        "technical_detail": "service=pricing-service timeout=5000ms"
+      },
+      {
+        "timestamp": "2024-03-15 14:11:02 UTC",
+        "phase": "outage",
+        "component": "api-gateway",
+        "event": "Circuit breaker opened for pricing service",
+        "severity": "ERROR",
+        "technical_detail": "service=pricing-service circuit_breaker=OPEN"
+      },
+      {
+        "timestamp": "2024-03-15 14:11:10 UTC",
+        "phase": "outage",
+        "component": "platform",
+        "event": "Complete trading halt initiated",
+        "severity": "CRIT",
+        "technical_detail": "Unable to serve price quotes - business impact critical"
+      },
+      {
+        "timestamp": "2024-03-15 14:11:45 UTC",
+        "phase": "outage",
+        "component": "oncall",
+        "event": "PagerDuty alert triggered",
+        "severity": "INFO",
+        "technical_detail": "Engineer notified"
+      },
+      {
+        "timestamp": "2024-03-15 14:16:30 UTC",
+        "phase": "mitigation",
+        "component": "oncall",
+        "event": "Engineer acknowledged and began investigation",
+        "severity": "INFO",
+        "technical_detail": "Response time: 4m 45s from alert"
+      },
+      {
+        "timestamp": "2024-03-15 14:22:08 UTC",
+        "phase": "mitigation",
+        "component": "db-primary",
+        "event": "Long-running query killed",
+        "severity": "INFO",
+        "technical_detail": "query_id=q_4489 duration=731s table=user_positions (batch job causing blockage)"
+      },
+      {
+        "timestamp": "2024-03-15 14:22:09 UTC",
+        "phase": "recovery",
+        "component": "db-primary",
+        "event": "Connection pool beginning recovery",
+        "severity": "INFO",
+        "technical_detail": "waiting connections reduced to 12 (from 47)"
+      },
+      {
+        "timestamp": "2024-03-15 14:23:15 UTC",
+        "phase": "recovery",
+        "component": "pricing-service",
+        "event": "Query latency normalizing",
+        "severity": "INFO",
+        "technical_detail": "Pricing service queries returning to normal performance"
+      },
+      {
+        "timestamp": "2024-03-15 14:24:00 UTC",
+        "phase": "recovery",
+        "component": "api-gateway",
+        "event": "Circuit breaker testing recovery",
+        "severity": "INFO",
+        "technical_detail": "circuit_breaker=HALF-OPEN (testing requests)"
+      },
+      {
+        "timestamp": "2024-03-15 14:25:30 UTC",
+        "phase": "recovery",
+        "component": "api-gateway",
+        "event": "Circuit breaker closed - service recovered",
+        "severity": "INFO",
+        "technical_detail": "circuit_breaker=CLOSED service=pricing-service"
+      },
+      {
+        "timestamp": "2024-03-15 14:26:45 UTC",
+        "phase": "recovery",
+        "component": "platform",
+        "event": "Trading resumed - full recovery",
+        "severity": "INFO",
+        "technical_detail": "All services operational, trading platform restored"
+      },
+      {
+        "timestamp": "2024-03-15 14:45:00 UTC",
+        "phase": "post-incident",
+        "component": "db-primary",
+        "event": "Root cause identified: batch job",
+        "severity": "INFO",
+        "technical_detail": "query q_4489 from job=user_positions_recalc scheduled daily at 14:00 UTC"
+      },
+      {
+        "timestamp": "2024-03-15 14:45:01 UTC",
+        "phase": "post-incident",
+        "component": "db-primary",
+        "event": "Root cause identified: missing database index",
+        "severity": "INFO",
+        "technical_detail": "table=user_positions missing index on (user_id, position_date) causing full table scan"
+      }
+    ],
+    "key_observations": [
+      "Incident triggered by daily batch job (user_positions_recalc) scheduled at 14:00 UTC performing full table scan on user_positions table",
+      "Missing composite index on (user_id, position_date) caused 731-second query that monopolized database connections",
+      "Database connection pool exhaustion (47 waiting connections) cascaded to pricing-service timeouts and circuit breaker activation",
+      "Business impact: Complete trading halt for 15.6 minutes due to inability to serve price quotes",
+      "Circuit breaker pattern successfully prevented further damage by failing fast once pricing-service became unavailable",
+      "MTTR: 15.58 minutes from first critical alert to full recovery",
+      "Mitigation: Killing the long-running query immediately freed database resources and allowed recovery",
+      "Latency degradation visible 6+ minutes before critical failure (p99: 120ms → 340ms), providing early warning signal",
+      "Remediation required: Add composite index on user_positions(user_id, position_date) and review batch job scheduling to avoid peak trading hours"
+    ]
+  },
+  {
+    "incident_id": "incident_b",
+    "summary": "Database connection pool exhaustion caused by unindexed batch job query, leading to order service outage and circuit breaker activation. Resolved by killing long-running query.",
+    "timeline": [
+      {
+        "timestamp": "2024-04-05 09:11:00 UTC",
+        "phase": "normal",
+        "component": "api-gateway",
+        "event": "Baseline performance observed",
+        "severity": "INFO",
+        "technical_detail": "Request latency p99=95ms (baseline)"
+      },
+      {
+        "timestamp": "2024-04-05 09:44:22 UTC",
+        "phase": "degradation",
+        "component": "order-service",
+        "event": "Slow database query detected",
+        "severity": "WARN",
+        "technical_detail": "query_id=q_9031 duration=1800ms"
+      },
+      {
+        "timestamp": "2024-04-05 09:44:55 UTC",
+        "phase": "degradation",
+        "component": "db-primary",
+        "event": "Database connection pool exhausted",
+        "severity": "ERROR",
+        "technical_detail": "pool_size=100 waiting=39 connections"
+      },
+      {
+        "timestamp": "2024-04-05 09:45:10 UTC",
+        "phase": "outage",
+        "component": "api-gateway",
+        "event": "Upstream service timeout",
+        "severity": "ERROR",
+        "technical_detail": "service=order-service"
+      },
+      {
+        "timestamp": "2024-04-05 09:45:28 UTC",
+        "phase": "outage",
+        "component": "api-gateway",
+        "event": "Circuit breaker opened for order service",
+        "severity": "ERROR",
+        "technical_detail": "service=order-service"
+      },
+      {
+        "timestamp": "2024-04-05 09:45:40 UTC",
+        "phase": "outage",
+        "component": "platform",
+        "event": "Order submission completely halted",
+        "severity": "CRIT",
+        "technical_detail": "Complete service outage"
+      },
+      {
+        "timestamp": "2024-04-05 09:57:14 UTC",
+        "phase": "mitigation",
+        "component": "db-primary",
+        "event": "Long-running query terminated",
+        "severity": "INFO",
+        "technical_detail": "query_id=q_9031 duration=748s table=open_orders"
+      },
+      {
+        "timestamp": "2024-04-05 09:57:15 UTC",
+        "phase": "recovery",
+        "component": "db-primary",
+        "event": "Connection pool beginning recovery",
+        "severity": "INFO",
+        "technical_detail": "Pool connections being released"
+      },
+      {
+        "timestamp": "2024-04-05 09:59:00 UTC",
+        "phase": "recovery",
+        "component": "platform",
+        "event": "Order submission service restored",
+        "severity": "INFO",
+        "technical_detail": "Full service recovery achieved"
+      },
+      {
+        "timestamp": "2024-04-05 10:15:00 UTC",
+        "phase": "post-incident",
+        "component": "db-primary",
+        "event": "Root cause identified: scheduled batch job",
+        "severity": "INFO",
+        "technical_detail": "job_name=open_orders_settlement scheduled daily at 09:30 UTC"
+      },
+      {
+        "timestamp": "2024-04-05 10:15:01 UTC",
+        "phase": "post-incident",
+        "component": "db-primary",
+        "event": "Missing database index identified",
+        "severity": "INFO",
+        "technical_detail": "Table open_orders lacks index on account_id, order_date causing full table scan"
+      }
+    ],
+    "key_observations": [
+      "Incident triggered by daily batch job (open_orders_settlement) scheduled at 09:30 UTC",
+      "Missing composite index on open_orders table (account_id, order_date) caused full table scan",
+      "Query q_9031 ran for 748 seconds (12.5 minutes) before being killed",
+      "Database connection pool exhaustion (100 connections, 39 waiting) cascaded to order-service",
+      "Circuit breaker pattern successfully prevented further damage by opening at 09:45:28",
+      "MTTR of 13.33 minutes from first critical to recovery",
+      "Incident window: 14.63 minutes from first warning to full recovery",
+      "Mitigation achieved by killing the problematic query, allowing connection pool to recover",
+      "Preventive action required: add composite index on open_orders(account_id, order_date)",
+      "Consider rescheduling batch job to off-peak hours or implementing query timeout limits"
+    ]
+  }
+]

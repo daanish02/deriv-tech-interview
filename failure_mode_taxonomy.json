@@ -1,0 +1,338 @@
+{
+  "failure_taxonomy": {
+    "categories": [
+      {
+        "category_id": "database_performance",
+        "category_name": "Database Performance Degradation",
+        "description": "Failures caused by inefficient database queries, missing indexes, or resource exhaustion",
+        "failure_modes": [
+          {
+            "failure_mode_id": "missing_index_batch_job",
+            "failure_mode_name": "Missing Index on Batch Job Query",
+            "description": "Batch job performs full table scan due to missing composite index, causing long-running query that exhausts connection pool",
+            "typical_duration_seconds": 730,
+            "blast_radius": "complete_service_outage",
+            "recurrence_count": 3,
+            "detection_methods": [
+              {
+                "method": "query_execution_plan_monitoring",
+                "signal": "Full table scan detected in query execution plan",
+                "lead_time_seconds": 0,
+                "reliability": "high"
+              },
+              {
+                "method": "slow_query_logging",
+                "signal": "Query duration exceeds threshold (>5s)",
+                "lead_time_seconds": 60,
+                "reliability": "high"
+              },
+              {
+                "method": "connection_pool_saturation",
+                "signal": "Connection pool utilization >90% with waiting connections",
+                "lead_time_seconds": 120,
+                "reliability": "high"
+              },
+              {
+                "method": "database_latency_monitoring",
+                "signal": "P95 query latency spike >200%",
+                "lead_time_seconds": 90,
+                "reliability": "medium"
+              }
+            ],
+            "prevention_controls": [
+              {
+                "control_id": "mandatory_index_review",
+                "control_name": "Mandatory Index Review for Batch Jobs",
+                "description": "Require database index analysis and approval before deploying any batch job to production",
+                "implementation": "Pre-production gate requiring DBA review of query execution plans against production-scale data",
+                "effectiveness": "high"
+              },
+              {
+                "control_id": "query_timeout_enforcement",
+                "control_name": "Query Timeout Limits",
+                "description": "Enforce maximum query execution time limits for all batch jobs",
+                "implementation": "Set statement_timeout=300s for batch jobs, 30s for real-time queries",
+                "effectiveness": "high"
+              },
+              {
+                "control_id": "off_peak_scheduling",
+                "control_name": "Off-Peak Batch Job Scheduling",
+                "description": "Schedule resource-intensive batch jobs during off-peak hours only",
+                "implementation": "Policy: batch jobs run 00:00-06:00 UTC only, with exceptions requiring VP approval",
+                "effectiveness": "medium"
+              },
+              {
+                "control_id": "workload_isolation",
+                "control_name": "Batch Workload Isolation",
+                "description": "Separate connection pools and resource quotas for batch vs real-time workloads",
+                "implementation": "Dedicated connection pool for batch jobs (max 20 connections), separate from real-time pool (80 connections)",
+                "effectiveness": "high"
+              },
+              {
+                "control_id": "automated_index_recommendations",
+                "control_name": "Automated Index Analysis",
+                "description": "Continuous monitoring of query patterns with automated index recommendations",
+                "implementation": "Weekly automated analysis of slow queries with missing index suggestions sent to DBA team",
+                "effectiveness": "medium"
+              }
+            ]
+          },
+          {
+            "failure_mode_id": "connection_pool_exhaustion",
+            "failure_mode_name": "Database Connection Pool Exhaustion",
+            "description": "Long-running queries consume all available database connections, blocking new requests",
+            "typical_duration_seconds": 600,
+            "blast_radius": "service_degradation_to_outage",
+            "recurrence_count": 4,
+            "detection_methods": [
+              {
+                "method": "connection_pool_metrics",
+                "signal": "Active connections >= pool_size with waiting queue >0",
+                "lead_time_seconds": 180,
+                "reliability": "high"
+              },
+              {
+                "method": "connection_wait_time",
+                "signal": "Average connection wait time >1s",
+                "lead_time_seconds": 120,
+                "reliability": "high"
+              }
+            ],
+            "prevention_controls": [
+              {
+                "control_id": "connection_pool_sizing",
+                "control_name": "Right-Sized Connection Pools",
+                "description": "Size connection pools based on workload analysis with headroom for spikes",
+                "implementation": "Increase pool size to 150 with dynamic scaling based on load",
+                "effectiveness": "medium"
+              },
+              {
+                "control_id": "connection_timeout_limits",
+                "control_name": "Connection Timeout Enforcement",
+                "description": "Enforce maximum connection hold time to prevent connection leaks",
+                "implementation": "Set idle_in_transaction_session_timeout=60s",
+                "effectiveness": "high"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "category_id": "workload_management",
+        "category_name": "Workload Management Failures",
+        "description": "Failures caused by improper scheduling, resource allocation, or isolation of different workload types",
+        "failure_modes": [
+          {
+            "failure_mode_id": "batch_realtime_contention",
+            "failure_mode_name": "Batch and Real-Time Workload Contention",
+            "description": "Batch processing jobs compete with real-time customer traffic for shared resources",
+            "typical_duration_seconds": 800,
+            "blast_radius": "complete_service_outage",
+            "recurrence_count": 3,
+            "detection_methods": [
+              {
+                "method": "resource_contention_metrics",
+                "signal": "Database CPU >80% during batch job execution",
+                "lead_time_seconds": 300,
+                "reliability": "medium"
+              },
+              {
+                "method": "service_latency_correlation",
+                "signal": "Real-time service latency spikes correlate with batch job start times",
+                "lead_time_seconds": 180,
+                "reliability": "high"
+              }
+            ],
+            "prevention_controls": [
+              {
+                "control_id": "resource_quotas",
+                "control_name": "Workload Resource Quotas",
+                "description": "Enforce resource limits (CPU, memory, I/O) for batch workloads",
+                "implementation": "Kubernetes resource limits for batch pods, database resource governor for batch queries",
+                "effectiveness": "high"
+              },
+              {
+                "control_id": "separate_infrastructure",
+                "control_name": "Dedicated Batch Infrastructure",
+                "description": "Run batch workloads on separate database replicas or compute resources",
+                "implementation": "Route batch queries to read replica, use separate compute cluster for batch processing",
+                "effectiveness": "high"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "category_id": "resilience_patterns",
+        "category_name": "Resilience Pattern Failures",
+        "description": "Failures in circuit breakers, timeouts, and other resilience mechanisms",
+        "failure_modes": [
+          {
+            "failure_mode_id": "cascading_circuit_breaker",
+            "failure_mode_name": "Cascading Circuit Breaker Activation",
+            "description": "Database issues trigger circuit breakers across multiple dependent services, causing widespread outage",
+            "typical_duration_seconds": 900,
+            "blast_radius": "complete_platform_outage",
+            "recurrence_count": 2,
+            "detection_methods": [
+              {
+                "method": "circuit_breaker_state_monitoring",
+                "signal": "Multiple circuit breakers open simultaneously",
+                "lead_time_seconds": 30,
+                "reliability": "high"
+              },
+              {
+                "method": "dependency_health_checks",
+                "signal": "Downstream dependency health check failures",
+                "lead_time_seconds": 60,
+                "reliability": "high"
+              }
+            ],
+            "prevention_controls": [
+              {
+                "control_id": "bulkhead_pattern",
+                "control_name": "Service Bulkhead Isolation",
+                "description": "Isolate critical services to prevent cascading failures",
+                "implementation": "Separate connection pools per service, independent circuit breakers with different thresholds",
+                "effectiveness": "high"
+              },
+              {
+                "control_id": "graceful_degradation",
+                "control_name": "Graceful Service Degradation",
+                "description": "Services continue operating with reduced functionality when dependencies fail",
+                "implementation": "Implement fallback mechanisms, cached data serving, read-only modes",
+                "effectiveness": "medium"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "category_id": "organizational_process",
+        "category_name": "Organizational Process Failures",
+        "description": "Failures caused by inadequate processes, governance, or learning from incidents",
+        "failure_modes": [
+          {
+            "failure_mode_id": "recurring_systemic_failure",
+            "failure_mode_name": "Recurring Systemic Failure Pattern",
+            "description": "Same root cause causes multiple incidents due to inadequate systemic remediation",
+            "typical_duration_seconds": 0,
+            "blast_radius": "organizational_learning_failure",
+            "recurrence_count": 3,
+            "detection_methods": [
+              {
+                "method": "incident_pattern_analysis",
+                "signal": "Same root_cause_category appears in multiple incidents within 90 days",
+                "lead_time_seconds": 0,
+                "reliability": "high"
+              },
+              {
+                "method": "remediation_tracking",
+                "signal": "Action items from previous incidents not completed before recurrence",
+                "lead_time_seconds": 0,
+                "reliability": "high"
+              }
+            ],
+            "prevention_controls": [
+              {
+                "control_id": "systemic_remediation_review",
+                "control_name": "Mandatory Systemic Remediation Review",
+                "description": "For any incident with similar historical incidents, require systemic remediation plan before closure",
+                "implementation": "Incident review board must approve systemic controls for recurring patterns, track to completion",
+                "effectiveness": "high"
+              },
+              {
+                "control_id": "pre_production_testing",
+                "control_name": "Production-Scale Performance Testing",
+                "description": "Require performance testing with production-scale data before deploying batch jobs",
+                "implementation": "Staging environment with production data volumes, automated performance regression tests",
+                "effectiveness": "high"
+              },
+              {
+                "control_id": "database_governance",
+                "control_name": "Database Change Governance",
+                "description": "Formal review and approval process for all database schema changes and new queries",
+                "implementation": "DBA review required for all schema changes, query performance analysis in CI/CD pipeline",
+                "effectiveness": "high"
+              }
+            ]
+          },
+          {
+            "failure_mode_id": "inadequate_observability",
+            "failure_mode_name": "Inadequate Observability and Alerting",
+            "description": "Early warning signals present but not monitored or acted upon before critical failure",
+            "typical_duration_seconds": 0,
+            "blast_radius": "delayed_detection",
+            "recurrence_count": 2,
+            "detection_methods": [
+              {
+                "method": "alert_coverage_analysis",
+                "signal": "Post-incident review identifies observable signals without corresponding alerts",
+                "lead_time_seconds": 0,
+                "reliability": "high"
+              }
+            ],
+            "prevention_controls": [
+              {
+                "control_id": "proactive_query_monitoring",
+                "control_name": "Proactive Query Performance Monitoring",
+                "description": "Alert on query execution plans showing full table scans or inefficient patterns",
+                "implementation": "Real-time query plan analysis with alerts for full table scans on tables >100k rows",
+                "effectiveness": "high"
+              },
+              {
+                "control_id": "leading_indicator_alerts",
+                "control_name": "Leading Indicator Alerting",
+                "description": "Alert on early warning signals before critical thresholds reached",
+                "implementation": "Alert at 70% connection pool utilization, query duration >10s, latency P95 >2x baseline",
+                "effectiveness": "medium"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "cross_cutting_recommendations": [
+      {
+        "recommendation_id": "database_performance_framework",
+        "title": "Comprehensive Database Performance Framework",
+        "description": "Implement end-to-end database performance management including index governance, query review, timeout enforcement, and workload isolation",
+        "priority": "critical",
+        "estimated_effort": "8-12 weeks",
+        "expected_impact": "Prevent 80% of database-related incidents"
+      },
+      {
+        "recommendation_id": "batch_job_standards",
+        "title": "Batch Job Deployment Standards",
+        "description": "Establish mandatory standards for batch job deployment including performance testing, off-peak scheduling, resource limits, and timeout configuration",
+        "priority": "critical",
+        "estimated_effort": "4-6 weeks",
+        "expected_impact": "Eliminate batch job-related outages"
+      },
+      {
+        "recommendation_id": "systemic_learning_process",
+        "title": "Systemic Learning and Remediation Process",
+        "description": "Implement process to identify recurring patterns and require systemic remediation before incident closure",
+        "priority": "high",
+        "estimated_effort": "2-4 weeks",
+        "expected_impact": "Reduce incident recurrence by 70%"
+      },
+      {
+        "recommendation_id": "workload_isolation_architecture",
+        "title": "Workload Isolation Architecture",
+        "description": "Separate batch and real-time workloads at infrastructure level with dedicated resources and connection pools",
+        "priority": "high",
+        "estimated_effort": "6-8 weeks",
+        "expected_impact": "Prevent cross-workload interference incidents"
+      }
+    ],
+    "metrics": {
+      "total_incidents_analyzed": 2,
+      "unique_failure_modes": 6,
+      "recurring_patterns": 3,
+      "critical_systemic_issues": 4,
+      "average_mttr_seconds": 870,
+      "prevention_controls_identified": 15
+    }
+  }
+}

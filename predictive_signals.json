@@ -1,0 +1,392 @@
+{
+  "predictive_signals": [
+    {
+      "signal_id": "PS-001",
+      "signal_name": "API Gateway P99 Latency Degradation",
+      "metric": "api_gateway.request.latency.p99",
+      "baseline": "95-120ms",
+      "warning_threshold": "2.0x baseline (190-240ms)",
+      "critical_threshold": "2.5x baseline (238-300ms)",
+      "lead_time_minutes": 6.5,
+      "lead_time_confidence": "high",
+      "detection_window": "5 minute rolling average",
+      "evidence": [
+        "incident_a: p99 latency increased to 340ms (2.8x baseline) at 14:08:44, critical failure at 14:11:10 (6.4 min lead time)",
+        "Latency degradation visible 6+ minutes before critical failure in incident_a"
+      ],
+      "recommended_alert": {
+        "severity": "WARNING",
+        "title": "API Gateway Latency Degradation - Potential Database Issue",
+        "condition": "p99 latency > 2.0x baseline for 3 consecutive minutes",
+        "action": "Immediately check database query performance and connection pool utilization",
+        "escalation": "Page on-call if exceeds 2.5x baseline or persists > 5 minutes"
+      },
+      "false_positive_risk": "low",
+      "business_impact_prevented": "6+ minutes advance warning before complete service outage"
+    },
+    {
+      "signal_id": "PS-002",
+      "signal_name": "Slow Database Query Detection",
+      "metric": "database.query.duration",
+      "baseline": "<500ms for typical queries",
+      "warning_threshold": "1500ms",
+      "critical_threshold": "3000ms",
+      "lead_time_minutes": 2.5,
+      "lead_time_confidence": "high",
+      "detection_window": "Real-time per-query monitoring",
+      "evidence": [
+        "incident_a: slow query detected at 14:09:01 (2100ms), critical failure at 14:11:10 (2.15 min lead time)",
+        "incident_a: multiple slow queries at 14:09:15 (3400ms), critical failure at 14:11:10 (1.92 min lead time)",
+        "incident_b: slow query detected at 09:44:22 (1800ms), critical failure at 09:45:40 (1.3 min lead time)"
+      ],
+      "recommended_alert": {
+        "severity": "WARNING",
+        "title": "Slow Database Query Detected - Potential Full Table Scan",
+        "condition": "Query duration > 1500ms OR multiple queries > 1000ms within 2 minutes",
+        "action": "Immediately investigate query execution plan, check for missing indexes, identify query source (batch job vs application)",
+        "escalation": "Auto-escalate if query duration > 3000ms or if multiple slow queries detected"
+      },
+      "false_positive_risk": "medium",
+      "business_impact_prevented": "1-2 minutes advance warning before connection pool exhaustion"
+    },
+    {
+      "signal_id": "PS-003",
+      "signal_name": "Database Connection Pool Saturation",
+      "metric": "database.connection_pool.utilization",
+      "baseline": "30-50% utilization",
+      "warning_threshold": "70% utilization",
+      "critical_threshold": "85% utilization OR any waiting connections",
+      "lead_time_minutes": 1.5,
+      "lead_time_confidence": "high",
+      "detection_window": "1 minute rolling average",
+      "evidence": [
+        "incident_a: pool exhausted at 14:10:33 (waiting=47), critical failure at 14:11:10 (0.62 min lead time)",
+        "incident_b: pool exhausted at 09:44:55 (waiting=39), critical failure at 09:45:40 (0.75 min lead time)"
+      ],
+      "recommended_alert": {
+        "severity": "CRITICAL",
+        "title": "Database Connection Pool Near Exhaustion - Imminent Outage Risk",
+        "condition": "Connection pool utilization > 70% OR any waiting connections detected",
+        "action": "IMMEDIATE: Identify and kill long-running queries, check for batch jobs, prepare for service degradation",
+        "escalation": "Immediate page to on-call SRE and DBA, auto-trigger incident response"
+      },
+      "false_positive_risk": "very_low",
+      "business_impact_prevented": "1-2 minutes to prevent complete service outage through proactive query termination"
+    },
+    {
+      "signal_id": "PS-004",
+      "signal_name": "Long-Running Query Detection",
+      "metric": "database.query.active_duration",
+      "baseline": "Most queries complete within 5 seconds",
+      "warning_threshold": "60 seconds",
+      "critical_threshold": "120 seconds",
+      "lead_time_minutes": 10.0,
+      "lead_time_confidence": "very_high",
+      "detection_window": "Real-time active query monitoring",
+      "evidence": [
+        "incident_a: query ran for 731 seconds total, killed at 14:22:08, first impact at ~14:09:00 (~13 min of runtime before visible impact)",
+        "incident_b: query ran for 748 seconds total, killed at 09:57:14, first impact at ~09:44:22 (~13 min of runtime before visible impact)"
+      ],
+      "recommended_alert": {
+        "severity": "WARNING at 60s, CRITICAL at 120s",
+        "title": "Long-Running Database Query - Potential Resource Exhaustion Risk",
+        "condition": "Any query running > 60 seconds",
+        "action": "Investigate query execution plan, check for full table scans, identify query source and business justification, prepare to terminate if non-critical",
+        "escalation": "Auto-escalate at 120 seconds with recommendation to kill query if not business-critical"
+      },
+      "false_positive_risk": "medium",
+      "business_impact_prevented": "10+ minutes advance warning before connection pool exhaustion and service impact"
+    },
+    {
+      "signal_id": "PS-005",
+      "signal_name": "Full Table Scan Detection",
+      "metric": "database.query.execution_plan.scan_type",
+      "baseline": "Index scans for production queries",
+      "warning_threshold": "Any full table scan on tables > 100K rows",
+      "critical_threshold": "Full table scan on tables > 1M rows OR during peak hours",
+      "lead_time_minutes": 15.0,
+      "lead_time_confidence": "very_high",
+      "detection_window": "Real-time query plan analysis",
+      "evidence": [
+        "incident_a: full table scan on user_positions table caused 731-second query",
+        "incident_b: full table scan on open_orders table caused 748-second query",
+        "Both incidents: full table scans started at batch job initiation (14:00 UTC and 09:30 UTC), visible impact 9-14 minutes later"
+      ],
+      "recommended_alert": {
+        "severity": "CRITICAL",
+        "title": "Full Table Scan Detected on Large Table - High Outage Risk",
+        "condition": "Query execution plan shows full table scan on table with > 100K rows",
+        "action": "IMMEDIATE: Evaluate query necessity, check for missing indexes, consider killing query if non-critical, block similar queries",
+        "escalation": "Immediate notification to DBA team and query owner, auto-escalate if table > 1M rows"
+      },
+      "false_positive_risk": "low",
+      "business_impact_prevented": "15+ minutes advance warning before resource exhaustion, allows time for proactive query termination"
+    },
+    {
+      "signal_id": "PS-006",
+      "signal_name": "Batch Job Execution During Peak Hours",
+      "metric": "batch_job.execution.start_time",
+      "baseline": "Batch jobs scheduled during off-peak hours (00:00-06:00 UTC)",
+      "warning_threshold": "Batch job starting during operational hours (06:00-22:00 UTC)",
+      "critical_threshold": "Resource-intensive batch job starting during peak hours (08:00-16:00 UTC)",
+      "lead_time_minutes": 10.0,
+      "lead_time_confidence": "very_high",
+      "detection_window": "Real-time batch job scheduler monitoring",
+      "evidence": [
+        "incident_a: user_positions_recalc batch job scheduled at 14:00 UTC (peak trading hours)",
+        "incident_b: open_orders_settlement batch job scheduled at 09:30 UTC (business hours)",
+        "Both incidents: batch jobs initiated 9-14 minutes before critical service impact"
+      ],
+      "recommended_alert": {
+        "severity": "WARNING",
+        "title": "Resource-Intensive Batch Job Starting During Peak Hours",
+        "condition": "Batch job with historical runtime > 5 minutes OR database-intensive job starting between 08:00-16:00 UTC",
+        "action": "Monitor database connection pool and query performance closely, prepare to terminate if service degradation detected, review job scheduling",
+        "escalation": "Notify on-call SRE team for awareness and monitoring"
+      },
+      "false_positive_risk": "low",
+      "business_impact_prevented": "10+ minutes advance warning, allows proactive monitoring and intervention before service impact"
+    },
+    {
+      "signal_id": "PS-007",
+      "signal_name": "Database Connection Pool Growth Rate",
+      "metric": "database.connection_pool.active_connections.rate_of_change",
+      "baseline": "Gradual connection growth < 5 connections/minute",
+      "warning_threshold": "Growth rate > 10 connections/minute",
+      "critical_threshold": "Growth rate > 20 connections/minute",
+      "lead_time_minutes": 3.0,
+      "lead_time_confidence": "high",
+      "detection_window": "1 minute rate of change calculation",
+      "evidence": [
+        "incident_a: rapid connection pool exhaustion from normal to 100/100 with 47 waiting within ~2 minutes",
+        "incident_b: rapid connection pool exhaustion from normal to 100/100 with 39 waiting within ~1 minute",
+        "Both incidents show rapid acceleration pattern before exhaustion"
+      ],
+      "recommended_alert": {
+        "severity": "WARNING",
+        "title": "Abnormal Database Connection Pool Growth - Potential Query Issue",
+        "condition": "Active connection growth rate > 10 connections/minute",
+        "action": "Immediately identify source of connection growth, check for long-running queries or connection leaks, prepare for pool exhaustion",
+        "escalation": "Auto-escalate if growth rate > 20 connections/minute or pool utilization > 80%"
+      },
+      "false_positive_risk": "medium",
+      "business_impact_prevented": "2-3 minutes advance warning before complete pool exhaustion"
+    },
+    {
+      "signal_id": "PS-008",
+      "signal_name": "Service Response Time Degradation Pattern",
+      "metric": "service.response_time.degradation_velocity",
+      "baseline": "Stable response times with < 10% variance",
+      "warning_threshold": "Response time increasing > 50% within 5 minutes",
+      "critical_threshold": "Response time increasing > 100% within 5 minutes",
+      "lead_time_minutes": 5.0,
+      "lead_time_confidence": "high",
+      "detection_window": "5 minute trend analysis",
+      "evidence": [
+        "incident_a: p99 latency increased from 120ms to 340ms (183% increase) between 14:02:11 and 14:08:44 (6.5 minutes)",
+        "Gradual degradation pattern visible before critical failure"
+      ],
+      "recommended_alert": {
+        "severity": "WARNING",
+        "title": "Service Response Time Degrading Rapidly - Investigate Upstream Dependencies",
+        "condition": "Response time increasing > 50% over 5-minute window",
+        "action": "Check database performance, connection pools, downstream service health, identify degradation source",
+        "escalation": "Escalate if degradation continues or exceeds 100% increase"
+      },
+      "false_positive_risk": "medium",
+      "business_impact_prevented": "5+ minutes advance warning before service timeout and circuit breaker activation"
+    },
+    {
+      "signal_id": "PS-009",
+      "signal_name": "Missing Index Detection on Query Execution",
+      "metric": "database.query.index_usage",
+      "baseline": "All production queries use indexes",
+      "warning_threshold": "Query without index usage on table > 10K rows",
+      "critical_threshold": "Query without index usage on table > 100K rows",
+      "lead_time_minutes": 15.0,
+      "lead_time_confidence": "very_high",
+      "detection_window": "Real-time query plan analysis",
+      "evidence": [
+        "incident_a: missing composite index on user_positions(user_id, position_date) caused full table scan",
+        "incident_b: missing composite index on open_orders(account_id, order_date) caused full table scan",
+        "Both incidents: missing indexes detectable from first query execution"
+      ],
+      "recommended_alert": {
+        "severity": "CRITICAL",
+        "title": "Query Executing Without Index on Large Table - High Risk",
+        "condition": "Query execution plan shows no index usage on table with > 10K rows",
+        "action": "IMMEDIATE: Evaluate query, check if index exists, consider killing query if table > 100K rows, create missing index",
+        "escalation": "Immediate notification to DBA team, auto-escalate if table > 100K rows or query duration > 30 seconds"
+      },
+      "false_positive_risk": "very_low",
+      "business_impact_prevented": "15+ minutes advance warning, allows time to create index or terminate query before service impact"
+    },
+    {
+      "signal_id": "PS-010",
+      "signal_name": "Circuit Breaker Half-Open State",
+      "metric": "circuit_breaker.state",
+      "baseline": "Circuit breakers in CLOSED state",
+      "warning_threshold": "Circuit breaker enters HALF-OPEN state",
+      "critical_threshold": "Circuit breaker enters OPEN state",
+      "lead_time_minutes": -1.0,
+      "lead_time_confidence": "n/a",
+      "detection_window": "Real-time state monitoring",
+      "evidence": [
+        "incident_a: circuit breaker opened at 14:11:02, indicating service already failed",
+        "incident_b: circuit breaker opened at 09:45:28, indicating service already failed",
+        "Circuit breaker is reactive, not predictive - included for completeness"
+      ],
+      "recommended_alert": {
+        "severity": "CRITICAL",
+        "title": "Circuit Breaker Opened - Service Failure Detected",
+        "condition": "Circuit breaker state changes to OPEN",
+        "action": "Service has failed - investigate root cause immediately, check upstream dependencies, database health, connection pools",
+        "escalation": "Immediate page to on-call, trigger incident response"
+      },
+      "false_positive_risk": "very_low",
+      "business_impact_prevented": "None - this is a reactive signal indicating failure has occurred, but critical for incident detection"
+    }
+  ],
+  "composite_signals": [
+    {
+      "composite_signal_id": "CS-001",
+      "signal_name": "Database Resource Exhaustion Cascade Pattern",
+      "component_signals": [
+        "PS-004 (Long-Running Query)",
+        "PS-005 (Full Table Scan)",
+        "PS-003 (Connection Pool Saturation)"
+      ],
+      "detection_logic": "IF (long_running_query > 60s AND full_table_scan_detected) OR (connection_pool_utilization > 70% AND slow_queries_detected)",
+      "lead_time_minutes": 8.0,
+      "lead_time_confidence": "very_high",
+      "evidence": [
+        "Both incidents showed this exact cascade: full table scan → long-running query → connection pool exhaustion → service failure",
+        "Pattern repeatable across incident_a, incident_b, and historical INC-2024-007"
+      ],
+      "recommended_alert": {
+        "severity": "CRITICAL",
+        "title": "DATABASE RESOURCE EXHAUSTION CASCADE DETECTED - IMMINENT OUTAGE",
+        "condition": "Multiple database stress signals detected simultaneously",
+        "action": "IMMEDIATE ACTION REQUIRED: Identify and kill long-running queries, check batch jobs, prepare for service degradation, notify incident commander",
+        "escalation": "Immediate page to on-call SRE and DBA, auto-trigger P1 incident, notify engineering leadership"
+      },
+      "false_positive_risk": "very_low",
+      "business_impact_prevented": "8+ minutes advance warning before complete service outage, high confidence prediction of imminent failure"
+    },
+    {
+      "composite_signal_id": "CS-002",
+      "signal_name": "Batch Job Risk Pattern",
+      "component_signals": [
+        "PS-006 (Batch Job During Peak Hours)",
+        "PS-004 (Long-Running Query)",
+        "PS-005 (Full Table Scan)"
+      ],
+      "detection_logic": "IF (batch_job_started_during_peak_hours AND (query_duration > 60s OR full_table_scan_detected))",
+      "lead_time_minutes": 12.0,
+      "lead_time_confidence": "very_high",
+      "evidence": [
+        "Both incidents triggered by batch jobs during operational hours performing full table scans",
+        "Pattern: batch job start → full table scan → long-running query → service impact after 9-14 minutes"
+      ],
+      "recommended_alert": {
+        "severity": "WARNING",
+        "title": "High-Risk Batch Job Pattern Detected - Monitor Closely",
+        "condition": "Batch job running during peak hours with poor query performance characteristics",
+        "action": "Monitor database connection pool and service latency closely, prepare to terminate batch job if service degradation detected, review job scheduling and query optimization",
+        "escalation": "Escalate to CRITICAL if connection pool utilization > 70% or service latency degrades > 2x baseline"
+      },
+      "false_positive_risk": "low",
+      "business_impact_prevented": "12+ minutes advance warning, allows time to terminate batch job before service impact"
+    },
+    {
+      "composite_signal_id": "CS-003",
+      "signal_name": "Service Degradation Acceleration Pattern",
+      "component_signals": [
+        "PS-001 (API Gateway Latency Degradation)",
+        "PS-002 (Slow Database Query)",
+        "PS-007 (Connection Pool Growth Rate)"
+      ],
+      "detection_logic": "IF (api_latency > 2x_baseline AND slow_queries_detected AND connection_pool_growth_rate > 10/min)",
+      "lead_time_minutes": 4.0,
+      "lead_time_confidence": "high",
+      "evidence": [
+        "incident_a showed latency degradation (14:08:44) → slow queries (14:09:01) → connection pool exhaustion (14:10:33) → failure (14:11:10)",
+        "Clear acceleration pattern visible across multiple metrics"
+      ],
+      "recommended_alert": {
+        "severity": "CRITICAL",
+        "title": "Service Degradation Accelerating - Outage Imminent",
+        "condition": "Multiple service health metrics degrading simultaneously",
+        "action": "IMMEDIATE: Identify root cause (likely database), check for long-running queries or batch jobs, prepare for service failure, consider proactive circuit breaker activation",
+        "escalation": "Immediate page to on-call, prepare incident response team"
+      },
+      "false_positive_risk": "low",
+      "business_impact_prevented": "4+ minutes advance warning before complete service failure"
+    }
+  ],
+  "alert_configuration_recommendations": [
+    {
+      "priority": "P0_CRITICAL",
+      "signals": [
+        "PS-003",
+        "PS-005",
+        "PS-009",
+        "CS-001"
+      ],
+      "rationale": "These signals have very high confidence, low false positive rates, and directly predict imminent outages with sufficient lead time for intervention",
+      "implementation": "Implement immediately with auto-escalation and incident trigger"
+    },
+    {
+      "priority": "P1_HIGH",
+      "signals": [
+        "PS-004",
+        "PS-006",
+        "PS-007",
+        "CS-002",
+        "CS-003"
+      ],
+      "rationale": "Strong predictive signals with good lead time, may require human judgment but indicate high risk",
+      "implementation": "Implement with on-call notification and monitoring dashboard"
+    },
+    {
+      "priority": "P2_MEDIUM",
+      "signals": [
+        "PS-001",
+        "PS-002",
+        "PS-008"
+      ],
+      "rationale": "Early warning signals with longer lead times, useful for proactive investigation",
+      "implementation": "Implement with dashboard alerts and optional notifications"
+    },
+    {
+      "priority": "P3_INFORMATIONAL",
+      "signals": [
+        "PS-010"
+      ],
+      "rationale": "Reactive signal for incident detection, not predictive",
+      "implementation": "Already implemented via circuit breaker, ensure proper alerting integration"
+    }
+  ],
+  "preventive_monitoring_strategy": {
+    "real_time_monitoring": [
+      "Continuous query execution plan analysis to detect full table scans before they cause impact",
+      "Active query duration monitoring with automatic alerts at 60s and 120s thresholds",
+      "Connection pool utilization monitoring with 1-minute granularity and growth rate calculation",
+      "Service latency monitoring with baseline comparison and degradation velocity calculation"
+    ],
+    "proactive_analysis": [
+      "Daily batch job schedule review against peak operational hours",
+      "Weekly database index coverage analysis to identify missing indexes before deployment",
+      "Query performance testing in staging environment with production-scale data",
+      "Database resource capacity planning based on batch job schedules and growth projections"
+    ],
+    "automated_remediation": [
+      "Automatic query termination for queries exceeding 300 seconds without business justification",
+      "Automatic batch job suspension if connection pool utilization exceeds 80%",
+      "Automatic circuit breaker activation if composite signal CS-001 detected",
+      "Automatic index recommendation generation for queries showing full table scans"
+    ],
+    "estimated_mttr_improvement": "From 13-16 minutes to 3-5 minutes with proactive signal detection and automated remediation",
+    "estimated_incident_prevention": "80-90% of similar incidents preventable through early detection and intervention based on PS-004, PS-005, and CS-001 signals"
+  }
+}

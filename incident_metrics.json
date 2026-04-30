@@ -1,0 +1,21 @@
+{
+  "incidents": [
+    {
+      "incident_id": "incident_a",
+      "first_warning": "2024-03-15 14:09:01 UTC",
+      "first_critical": "2024-03-15 14:11:10 UTC",
+      "final_recovery": "2024-03-15 14:26:45 UTC",
+      "incident_window_minutes": 17.73,
+      "mttr_minutes": 15.58
+    },
+    {
+      "incident_id": "incident_b",
+      "first_warning": "2024-04-05 09:44:22 UTC",
+      "first_critical": "2024-04-05 09:45:40 UTC",
+      "final_recovery": "2024-04-05 09:59:00 UTC",
+      "incident_window_minutes": 14.63,
+      "mttr_minutes": 13.33
+    }
+  ],
+  "average_mttr_minutes": 14.46
+}

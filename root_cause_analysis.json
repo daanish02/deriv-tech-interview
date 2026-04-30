@@ -1,0 +1,81 @@
+{
+  "incidents": [
+    {
+      "incident_id": "incident_a",
+      "root_cause": "Daily batch job (user_positions_recalc) scheduled at 14:00 UTC performed full table scan on user_positions table due to missing composite index on (user_id, position_date), causing 731-second query that exhausted database connection pool and cascaded to complete trading platform outage",
+      "root_cause_category": "missing_index_batch_job",
+      "contributing_factors": [
+        "Batch job scheduled during peak trading hours (14:00 UTC)",
+        "Missing composite database index on user_positions(user_id, position_date)",
+        "No query timeout limits configured for batch jobs",
+        "Database connection pool size (100) insufficient to handle long-running query impact",
+        "Lack of query performance monitoring and alerting before production deployment",
+        "No isolation between batch workloads and critical real-time trading services"
+      ],
+      "evidence": [
+        "query_id=q_4489 duration=731s table=user_positions (batch job causing blockage) - 2024-03-15 14:22:08 UTC",
+        "Database connection pool exhausted: pool_size=100, waiting=47 connections - 2024-03-15 14:10:33 UTC",
+        "Root cause identified: table=user_positions missing index on (user_id, position_date) causing full table scan - 2024-03-15 14:45:01 UTC",
+        "Root cause identified: batch job query q_4489 from job=user_positions_recalc scheduled daily at 14:00 UTC - 2024-03-15 14:45:00 UTC",
+        "Circuit breaker opened for pricing service - 2024-03-15 14:11:02 UTC",
+        "Complete trading halt initiated - 2024-03-15 14:11:10 UTC"
+      ],
+      "similar_historical": [
+        "INC-2024-007",
+        "INC-2023-041",
+        "INC-2023-089"
+      ]
+    },
+    {
+      "incident_id": "incident_b",
+      "root_cause": "Daily batch job (open_orders_settlement) scheduled at 09:30 UTC performed full table scan on open_orders table due to missing composite index on (account_id, order_date), causing 748-second query that exhausted database connection pool and cascaded to complete order service outage",
+      "root_cause_category": "missing_index_batch_job",
+      "contributing_factors": [
+        "Batch job scheduled during business hours (09:30 UTC)",
+        "Missing composite database index on open_orders(account_id, order_date)",
+        "No query timeout limits configured for batch jobs",
+        "Database connection pool size (100) insufficient to handle long-running query impact",
+        "Lack of pre-production query performance testing",
+        "No resource isolation between batch processing and real-time order processing"
+      ],
+      "evidence": [
+        "query_id=q_9031 duration=748s table=open_orders - 2024-04-05 09:57:14 UTC",
+        "Database connection pool exhausted: pool_size=100 waiting=39 connections - 2024-04-05 09:44:55 UTC",
+        "Missing database index identified: Table open_orders lacks index on account_id, order_date causing full table scan - 2024-04-05 10:15:01 UTC",
+        "Root cause identified: scheduled batch job job_name=open_orders_settlement scheduled daily at 09:30 UTC - 2024-04-05 10:15:00 UTC",
+        "Circuit breaker opened for order service - 2024-04-05 09:45:28 UTC",
+        "Order submission completely halted - 2024-04-05 09:45:40 UTC"
+      ],
+      "similar_historical": [
+        "INC-2024-007",
+        "INC-2023-041",
+        "INC-2023-089"
+      ]
+    }
+  ],
+  "common_patterns": [
+    "Both incidents caused by daily batch jobs performing full table scans due to missing composite database indexes",
+    "Identical failure cascade pattern: missing index → full table scan → long-running query (730+ seconds) → connection pool exhaustion → service timeouts → circuit breaker activation → complete service outage",
+    "Both batch jobs scheduled during operational hours (14:00 UTC and 09:30 UTC) when services are actively serving customer traffic",
+    "Same database connection pool size (100) exhausted in both incidents with similar waiting connection counts (47 and 39)",
+    "Identical mitigation strategy: killing the long-running query immediately restored service in both cases",
+    "Circuit breaker pattern successfully prevented cascading failures in both incidents by failing fast",
+    "Similar MTTR values (15.58 and 13.33 minutes) indicating consistent incident response effectiveness",
+    "Both incidents showed early warning signals (slow query warnings) 1-2 minutes before critical failure",
+    "No query timeout limits configured in either case, allowing queries to run indefinitely",
+    "Lack of workload isolation between batch processing and real-time customer-facing services"
+  ],
+  "systemic_issues": [
+    "Missing database indexing strategy and governance: No systematic review process for ensuring proper indexes exist before deploying batch jobs or queries to production",
+    "Inadequate query performance testing: Batch jobs deployed to production without performance testing against production-scale data volumes",
+    "Lack of query timeout enforcement: No mandatory timeout limits configured for batch jobs or long-running queries to prevent runaway queries",
+    "Poor batch job scheduling practices: Critical batch jobs scheduled during peak operational hours instead of off-peak windows",
+    "Insufficient workload isolation: No separation between batch processing workloads and real-time customer-facing transaction processing (shared connection pool, no resource quotas)",
+    "Database connection pool sizing inadequate: Pool size of 100 connections insufficient to absorb impact of long-running queries during normal operations",
+    "Absence of proactive query monitoring: No alerting on query execution plans showing full table scans or queries exceeding performance thresholds before they cause outages",
+    "Lack of database resource governance: No query resource limits (CPU time, I/O limits, connection time) to prevent single queries from monopolizing database resources",
+    "Insufficient observability: Early warning signals (latency degradation) present but not acted upon before critical failure",
+    "Recurring pattern not addressed: Similar incident (INC-2024-007) occurred previously with same root cause category, indicating systemic learning and remediation gaps"
+  ],
+  "historical_correlation": "Both incident_a and incident_b are nearly identical to historical incident INC-2024-007 (batch job during trading hours causing full table scan), indicating a RECURRING SYSTEMIC FAILURE. The organization has experienced this exact failure pattern at least three times (INC-2024-007, incident_a, incident_b) within approximately 3-4 months, demonstrating that previous incidents did not result in effective systemic remediation. Both incidents also share characteristics with INC-2023-041 (connection pool exhaustion due to missing query timeout) and INC-2023-089 (DB latency cascade causing circuit breaker activation). The consistent recurrence of missing_index_batch_job incidents (INC-2024-007 → incident_a → incident_b) represents a critical organizational failure to implement preventive controls after the first occurrence. The pattern suggests reactive incident response (fixing individual incidents) without addressing underlying systemic issues around database performance governance, query review processes, and batch job scheduling policies. Average MTTR has improved (historical: 22-31 minutes, current: 13-16 minutes) indicating better incident response, but the continued recurrence indicates failure to prevent similar incidents through systemic improvements."
+}

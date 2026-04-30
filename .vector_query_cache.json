@@ -1,0 +1,52 @@
+{
+  "b8528cf593fa46215be56748e36c05f3": [
+    {
+      "page_content": "[failure_taxonomy/categories[2]/failure_modes[0]/detection_methods[0]] method: circuit_breaker_state_monitoring | signal: Multiple circuit breakers open simultaneously | reliability: high",
+      "metadata": {
+        "method": "circuit_breaker_state_monitoring",
+        "path": "failure_taxonomy/categories[2]/failure_modes[0]/detection_methods[0]",
+        "reliability": "high",
+        "signal": "Multiple circuit breakers open simultaneously"
+      }
+    },
+    {
+      "page_content": "[failure_taxonomy/categories[2]/failure_modes[0]] failure_mode_id: cascading_circuit_breaker | failure_mode_name: Cascading Circuit Breaker Activation | description: Database issues trigger circuit breakers across multiple dependent services, causing widespread outage | blast_radius: complete_platform_outage",
+      "metadata": {
+        "blast_radius": "complete_platform_outage",
+        "description": "Database issues trigger circuit breakers across multiple dependent services, causing widespread outage",
+        "failure_mode_id": "cascading_circuit_breaker",
+        "failure_mode_name": "Cascading Circuit Breaker Activation",
+        "path": "failure_taxonomy/categories[2]/failure_modes[0]"
+      }
+    },
+    {
+      "page_content": "[failure_taxonomy/categories[2]] category_id: resilience_patterns | category_name: Resilience Pattern Failures | description: Failures in circuit breakers, timeouts, and other resilience mechanisms",
+      "metadata": {
+        "category_id": "resilience_patterns",
+        "category_name": "Resilience Pattern Failures",
+        "description": "Failures in circuit breakers, timeouts, and other resilience mechanisms",
+        "path": "failure_taxonomy/categories[2]"
+      }
+    },
+    {
+      "page_content": "[failure_taxonomy/categories[2]/failure_modes[0]/prevention_controls[0]] control_id: bulkhead_pattern | control_name: Service Bulkhead Isolation | description: Isolate critical services to prevent cascading failures | implementation: Separate connection pools per service, independent circuit breakers with different thresholds | effectiveness: high",
+      "metadata": {
+        "control_id": "bulkhead_pattern",
+        "control_name": "Service Bulkhead Isolation",
+        "description": "Isolate critical services to prevent cascading failures",
+        "effectiveness": "high",
+        "implementation": "Separate connection pools per service, independent circuit breakers with different thresholds",
+        "path": "failure_taxonomy/categories[2]/failure_modes[0]/prevention_controls[0]"
+      }
+    },
+    {
+      "page_content": "[failure_taxonomy/categories[3]/failure_modes[0]/detection_methods[1]] method: remediation_tracking | signal: Action items from previous incidents not completed before recurrence | reliability: high",
+      "metadata": {
+        "method": "remediation_tracking",
+        "path": "failure_taxonomy/categories[3]/failure_modes[0]/detection_methods[1]",
+        "reliability": "high",
+        "signal": "Action items from previous incidents not completed before recurrence"
+      }
+    }
+  ]
+}
