@@ -9,29 +9,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 import config
 from pipeline.llm_client import get_llm, invoke_and_log
 from pipeline.state import PipelineState
+from prompts import postmortem_generation as prompts
 
 logger = logging.getLogger(__name__)
-
-SYSTEM_PROMPT = """You are an SRE writing a concise post-mortem in markdown. Include these sections:
-# Post-Mortem: [Title]
-**Incident ID:** [id]
-## Executive Summary
-2-3 sentences.
-## Impact
-1-2 sentences.
-## Timeline Summary
-Condensed key events as bullet list.
-## Root Cause
-1 paragraph.
-## Contributing Factors
-- bullet list
-## Action Items
-| Priority | Title | Component | Owner | Category |
-|----------|-------|-----------|-------|----------|
-Include 3-5 rows. Priority: P0-P3. Category: prevention/detection/response/recovery.
-## Lessons Learned
-- 2-3 bullets
-Be concise but technically detailed. Reference concrete components/services in action items."""
 
 POSTMORTEM_FILES = {
     "incident_a": config.POSTMORTEM_A_FILE,
@@ -95,16 +75,15 @@ def postmortem_generator_node(state: PipelineState) -> dict:
             (i for i in rca.get("incidents", []) if i["incident_id"] == incident_id),
             {},
         )
-        user_content = (
-            f"Incident ID: {incident_id}\n\n"
-            f"Timeline:\n{json.dumps(timeline, indent=2)}\n\n"
-            f"Root Cause Analysis:\n{json.dumps(incident_rca, indent=2)}\n\n"
-            f"Metrics:\n{json.dumps(metrics, indent=2)}\n\n"
-            f"Historical Incidents:\n{json.dumps(historical, indent=2)}\n\n"
-            "Generate the post-mortem report."
+        user_content = prompts.USER_TEMPLATE.format(
+            incident_id=incident_id,
+            timeline=json.dumps(timeline, indent=2),
+            root_cause=json.dumps(incident_rca, indent=2),
+            metrics=json.dumps(metrics, indent=2),
+            historical=json.dumps(historical, indent=2),
         )
         messages = [
-            SystemMessage(content=SYSTEM_PROMPT),
+            SystemMessage(content=prompts.SYSTEM),
             HumanMessage(content=user_content),
         ]
         result, record = invoke_and_log(

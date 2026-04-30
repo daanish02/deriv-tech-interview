@@ -238,6 +238,14 @@ deriv-tech-interview/
 │   ├── systemic_actions.py     # Cross-incident action analysis
 │   ├── optional_analyses.py    # LLM: MTTR, comms, taxonomy, signals
 │   └── vector_store.py         # Pinecone vector store (LangChain)
+├── prompts/                    # LLM prompt strings (separated from pipeline logic)
+│   ├── timeline_reconstruction.py  # Stage 1: timeline reconstruction prompts
+│   ├── root_cause_analysis.py      # Stage 2: root cause analysis prompts
+│   ├── postmortem_generation.py    # Stage 3: post-mortem generation prompts
+│   ├── mttr_analysis.py            # Optional: MTTR trend analysis prompts
+│   ├── communication_drafts.py     # Optional: stakeholder comms prompts
+│   ├── failure_taxonomy.py         # Optional: failure mode taxonomy prompts
+│   └── predictive_signals.py       # Optional: predictive signal prompts
 ├── models/
 │   ├── log_entry.py            # ParsedLogEntry, ParsedFields
 │   ├── incident.py             # IncidentWindow, IncidentMetrics

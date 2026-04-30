@@ -9,21 +9,9 @@ import config
 from models.root_cause import CrossIncidentAnalysis
 from pipeline.llm_client import get_structured_llm, invoke_and_log
 from pipeline.state import PipelineState
+from prompts import root_cause_analysis as prompts
 
 logger = logging.getLogger(__name__)
-
-SYSTEM_PROMPT = """You are an expert Site Reliability Engineer performing root cause analysis.
-Analyze the provided incident timelines, metrics, and historical incident database.
-Identify root causes, contributing factors, common patterns, and systemic issues.
-Correlate with historical incidents to identify recurring problems.
-
-Use these root cause categories when applicable:
-- missing_query_timeout: Queries running without timeout limits
-- db_latency_cascade: DB latency causing cascading service failures
-- missing_index_batch_job: Batch jobs triggering full table scans due to missing indexes
-- connection_pool_exhaustion: Connection pool saturation
-- circuit_breaker_failure: Circuit breaker issues
-- scheduling_conflict: Batch jobs running during peak hours"""
 
 
 def root_cause_analyzer_node(state: PipelineState) -> dict:
@@ -42,17 +30,14 @@ def root_cause_analyzer_node(state: PipelineState) -> dict:
         config.HISTORICAL_INCIDENTS_FILE.read_text(encoding="utf-8")
     )
 
-    user_content = (
-        f"Incident timelines:\n{json.dumps(state['timelines'], indent=2)}\n\n"
-        f"Incident metrics:\n{json.dumps(state['incident_metrics'], indent=2)}\n\n"
-        f"Historical incidents database:\n{json.dumps(historical, indent=2)}\n\n"
-        "Perform a thorough cross-incident root cause analysis. "
-        "Identify root causes, contributing factors, common patterns, "
-        "systemic issues, and correlation with historical incidents."
+    user_content = prompts.USER_TEMPLATE.format(
+        timelines=json.dumps(state["timelines"], indent=2),
+        metrics=json.dumps(state["incident_metrics"], indent=2),
+        historical=json.dumps(historical, indent=2),
     )
 
     messages = [
-        SystemMessage(content=SYSTEM_PROMPT),
+        SystemMessage(content=prompts.SYSTEM),
         HumanMessage(content=user_content),
     ]
 

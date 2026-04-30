@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(uv add *)"
+      "Bash(uv add *)",
+      "Read(//c/Users/Danish/Desktop/deriv-tech-interview/pipeline//**)",
+      "Read(//c/Users/Danish/Desktop/deriv-tech-interview/models//**)"
     ]
   }
 }

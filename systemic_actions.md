@@ -2,71 +2,67 @@
 
 ## Overview
 Analyzed action items across 2 incidents.
-Found 4 systemic action groups.
+Found 3 systemic action groups.
 
 ## Systemic Issues (Shared Across Incidents)
 
-### 1. Db-Primary
+### 1. Prevention
 **Affected incidents:** incident_a, incident_b
 
-- **[P0]** Add composite index on `user_positions(user_id, position_date)` and validate query performance
-  - Add composite index on `user_positions(user_id, position_date)` and validate query performance
-- **[P1]** Implement separate connection pools for batch vs. real-time workloads with resource limits
-  - Implement separate connection pools for batch vs. real-time workloads with resource limits
-- **[P0]** Add composite index on `open_orders(account_id, order_date)`
-  - Add composite index on `open_orders(account_id, order_date)`
-- **[P2]** Add connection pool utilization alerting at 70% threshold
-  - Add connection pool utilization alerting at 70% threshold
+- **[P0]** Add composite index on user_positions(user_id, position_date) and validate query plan for user_positions_recalc batch job
+  - Add composite index on user_positions(user_id, position_date) and validate query plan for user_positions_recalc batch job
+- **[P0]** Reschedule user_positions_recalc batch job to 02:00 UTC (off-peak hours) and implement maintenance window policy for all batch jobs
+  - Reschedule user_positions_recalc batch job to 02:00 UTC (off-peak hours) and implement maintenance window policy for all batch jobs
+- **[P0]** Implement 60-second query timeout for all batch jobs accessing db-primary
+  - Implement 60-second query timeout for all batch jobs accessing db-primary
+- **[P1]** Create dedicated read replica (db-batch-replica) for batch workloads and migrate user_positions_recalc to isolated connection pool
+  - Create dedicated read replica (db-batch-replica) for batch workloads and migrate user_positions_recalc to isolated connection pool
+- **[P2]** Implement mandatory EXPLAIN analysis and query performance testing in CI/CD pipeline for all queries against user_positions, transactions, and orders tables
+  - Implement mandatory EXPLAIN analysis and query performance testing in CI/CD pipeline for all queries against user_positions, transactions, and orders tables
+- **[P0]** Create composite index on `open_orders(account_id, order_date)` in production db-primary
+  - Create composite index on `open_orders(account_id, order_date)` in production db-primary
+- **[P0]** Implement 60-second query timeout for all `open_orders_settlement` batch job queries
+  - Implement 60-second query timeout for all `open_orders_settlement` batch job queries
+- **[P0]** Reschedule `open_orders_settlement` job from 09:30 UTC to 02:00 UTC (off-peak)
+  - Reschedule `open_orders_settlement` job from 09:30 UTC to 02:00 UTC (off-peak)
+- **[P1]** Implement separate connection pool for batch jobs (20 connections) isolated from order-service pool (80 connections)
+  - Implement separate connection pool for batch jobs (20 connections) isolated from order-service pool (80 connections)
+- **[P2]** Add query execution plan analysis to CI/CD pipeline for all queries against `open_orders` table
+  - Add query execution plan analysis to CI/CD pipeline for all queries against `open_orders` table
 
-### 2. Batch-Scheduler
+### 2. Detection
 **Affected incidents:** incident_a, incident_b
 
-- **[P1]** Reschedule `user_positions_recalc` to off-peak hours (02:00 UTC) with trading calendar awareness
-  - Reschedule `user_positions_recalc` to off-peak hours (02:00 UTC) with trading calendar awareness
-- **[P1]** Reschedule `open_orders_settlement` batch job to off-peak hours (02:00 UTC)
-  - Reschedule `open_orders_settlement` batch job to off-peak hours (02:00 UTC)
+- **[P1]** Add alerting on db-primary connection pool utilization >70% and query duration >10s for user_positions table
+  - Add alerting on db-primary connection pool utilization >70% and query duration >10s for user_positions table
+- **[P1]** Add connection pool exhaustion alert at 80% threshold (80/100 connections) for db-primary
+  - Add connection pool exhaustion alert at 80% threshold (80/100 connections) for db-primary
 
-### 3. Prevention
+### 3. Response
 **Affected incidents:** incident_a, incident_b
 
-- **[P0]** Implement mandatory query timeouts for all batch jobs (max 60s)
-  - Implement mandatory query timeouts for all batch jobs (max 60s)
-- **[P3]** Conduct review of all batch jobs for missing indexes and schedule conflicts with trading hours
-  - Conduct review of all batch jobs for missing indexes and schedule conflicts with trading hours
-- **[P0]** Implement query timeout limits (60s) for all batch job queries
-  - Implement query timeout limits (60s) for all batch job queries
-- **[P1]** Create dedicated read replica and connection pool for batch processing
-  - Create dedicated read replica and connection pool for batch processing
-- **[P3]** Conduct audit of all batch jobs for missing indexes and scheduling conflicts
-  - Conduct audit of all batch jobs for missing indexes and scheduling conflicts
-
-### 4. Detection
-**Affected incidents:** incident_a, incident_b
-
-- **[P2]** Add automated EXPLAIN plan analysis to CI/CD pipeline for query performance validation
-  - Add automated EXPLAIN plan analysis to CI/CD pipeline for query performance validation
-- **[P2]** Implement proactive alerting on connection pool utilization >70% with 2-minute threshold
-  - Implement proactive alerting on connection pool utilization >70% with 2-minute threshold
-- **[P2]** Implement automated query plan analysis in CI/CD for schema changes
-  - Implement automated query plan analysis in CI/CD for schema changes
+- **[P2]** Create runbook for pricing-service circuit breaker incidents with automated query kill procedure for db-primary queries >60s
+  - Create runbook for pricing-service circuit breaker incidents with automated query kill procedure for db-primary queries >60s
+- **[P2]** Create runbook for connection pool exhaustion incidents referencing query termination procedure for `q_9031`-type scenarios
+  - Create runbook for connection pool exhaustion incidents referencing query termination procedure for `q_9031`-type scenarios
 
 ## All Action Items by Incident
 
 ### incident_a
-- **[P0]** Add composite index on `user_positions(user_id, position_date)` and validate query performance (db-primary)
-- **[P0]** Implement mandatory query timeouts for all batch jobs (max 60s) (user_positions_recalc, batch-framework)
-- **[P1]** Reschedule `user_positions_recalc` to off-peak hours (02:00 UTC) with trading calendar awareness (batch-scheduler)
-- **[P1]** Implement separate connection pools for batch vs. real-time workloads with resource limits (db-primary)
-- **[P2]** Add automated EXPLAIN plan analysis to CI/CD pipeline for query performance validation (ci-cd-pipeline)
-- **[P2]** Implement proactive alerting on connection pool utilization >70% with 2-minute threshold (monitoring)
-- **[P3]** Conduct review of all batch jobs for missing indexes and schedule conflicts with trading hours (all-batch-jobs)
+- **[P0]** Add composite index on user_positions(user_id, position_date) and validate query plan for user_positions_recalc batch job (db-primary, user_positions_recalc)
+- **[P0]** Reschedule user_positions_recalc batch job to 02:00 UTC (off-peak hours) and implement maintenance window policy for all batch jobs (user_positions_recalc)
+- **[P0]** Implement 60-second query timeout for all batch jobs accessing db-primary (db-primary, user_positions_recalc)
+- **[P1]** Create dedicated read replica (db-batch-replica) for batch workloads and migrate user_positions_recalc to isolated connection pool (db-primary, user_positions_recalc)
+- **[P1]** Add alerting on db-primary connection pool utilization >70% and query duration >10s for user_positions table (db-primary, monitoring)
+- **[P2]** Implement mandatory EXPLAIN analysis and query performance testing in CI/CD pipeline for all queries against user_positions, transactions, and orders tables (CI/CD, Database Team)
+- **[P2]** Create runbook for pricing-service circuit breaker incidents with automated query kill procedure for db-primary queries >60s (pricing-service, api-gateway, db-primary)
 
 ### incident_b
-- **[P0]** Add composite index on `open_orders(account_id, order_date)` (db-primary)
-- **[P0]** Implement query timeout limits (60s) for all batch job queries (open_orders_settlement)
-- **[P1]** Reschedule `open_orders_settlement` batch job to off-peak hours (02:00 UTC) (batch-scheduler)
-- **[P1]** Create dedicated read replica and connection pool for batch processing (db-infrastructure)
-- **[P2]** Implement automated query plan analysis in CI/CD for schema changes (ci-pipeline)
-- **[P2]** Add connection pool utilization alerting at 70% threshold (db-primary)
-- **[P3]** Conduct audit of all batch jobs for missing indexes and scheduling conflicts (batch-jobs)
+- **[P0]** Create composite index on `open_orders(account_id, order_date)` in production db-primary (db-primary)
+- **[P0]** Implement 60-second query timeout for all `open_orders_settlement` batch job queries (open_orders_settlement)
+- **[P0]** Reschedule `open_orders_settlement` job from 09:30 UTC to 02:00 UTC (off-peak) (open_orders_settlement)
+- **[P1]** Add connection pool exhaustion alert at 80% threshold (80/100 connections) for db-primary (db-primary)
+- **[P1]** Implement separate connection pool for batch jobs (20 connections) isolated from order-service pool (80 connections) (db-primary, order-service)
+- **[P2]** Add query execution plan analysis to CI/CD pipeline for all queries against `open_orders` table (CI/CD Pipeline)
+- **[P2]** Create runbook for connection pool exhaustion incidents referencing query termination procedure for `q_9031`-type scenarios (Runbooks)
 

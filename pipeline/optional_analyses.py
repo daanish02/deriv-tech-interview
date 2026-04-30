@@ -9,6 +9,10 @@ from langchain_core.messages import HumanMessage, SystemMessage
 import config
 from pipeline.llm_client import get_llm, invoke_and_log
 from pipeline.state import PipelineState
+from prompts import mttr_analysis as mttr_prompts
+from prompts import communication_drafts as comms_prompts
+from prompts import failure_taxonomy as taxonomy_prompts
+from prompts import predictive_signals as signals_prompts
 
 logger = logging.getLogger(__name__)
 
@@ -29,14 +33,11 @@ def _mttr_analysis(state: PipelineState) -> tuple[str, dict]:
     metrics = state["incident_metrics"]
 
     messages = [
-        SystemMessage(content="You are an SRE analyzing MTTR trends. Be concise."),
-        HumanMessage(
-            content=(
-                f"Current metrics:\n{json.dumps(metrics, indent=2)}\n\n"
-                f"Historical:\n{json.dumps(historical, indent=2)}\n\n"
-                "Compare current vs historical MTTR. Identify trends and improvements. Markdown, keep under 500 words."
-            )
-        ),
+        SystemMessage(content=mttr_prompts.SYSTEM),
+        HumanMessage(content=mttr_prompts.USER_TEMPLATE.format(
+            metrics=json.dumps(metrics, indent=2),
+            historical=json.dumps(historical, indent=2),
+        )),
     ]
     result, record = invoke_and_log(
         llm,
@@ -59,18 +60,15 @@ def _communication_drafts(state: PipelineState) -> tuple[str, dict]:
         Tuple of (markdown content, LLM call record dict).
     """
     llm = get_llm()
+    postmortem_context = "\n---\n".join(
+        f"[{iid}]\n{pm[:config.POSTMORTEM_CONTEXT_MAX_LENGTH]}"
+        for iid, pm in state.get("postmortems", {}).items()
+    )
     messages = [
-        SystemMessage(content="You are a communications expert. Be concise."),
-        HumanMessage(
-            content=(
-                "Incident summaries:\n"
-                + "\n---\n".join(
-                    pm[:config.POSTMORTEM_CONTEXT_MAX_LENGTH] for pm in state.get("postmortems", {}).values()
-                )
-                + "\n\nDraft brief stakeholder comms for each incident: "
-                "initial notification, status update, resolution notice. Markdown, keep each under 200 words."
-            )
-        ),
+        SystemMessage(content=comms_prompts.SYSTEM),
+        HumanMessage(content=comms_prompts.USER_TEMPLATE.format(
+            postmortem_context=postmortem_context,
+        )),
     ]
     result, record = invoke_and_log(
         llm,
@@ -95,15 +93,10 @@ def _failure_taxonomy(state: PipelineState) -> tuple[str, dict]:
     llm = get_llm()
     rca = state["root_cause_analysis"]
     messages = [
-        SystemMessage(
-            content="You are an SRE creating failure taxonomies. Output JSON only."
-        ),
-        HumanMessage(
-            content=(
-                f"Root cause analysis:\n{json.dumps(rca, indent=2)}\n\n"
-                "Create concise failure mode taxonomy JSON: categories, failure modes, detection, prevention. Valid JSON only."
-            )
-        ),
+        SystemMessage(content=taxonomy_prompts.SYSTEM),
+        HumanMessage(content=taxonomy_prompts.USER_TEMPLATE.format(
+            rca=json.dumps(rca, indent=2),
+        )),
     ]
     result, record = invoke_and_log(
         llm,
@@ -142,16 +135,11 @@ def _predictive_signals(state: PipelineState) -> tuple[str, dict]:
     """
     llm = get_llm()
     messages = [
-        SystemMessage(
-            content="You are an SRE identifying predictive signals. Output JSON only."
-        ),
-        HumanMessage(
-            content=(
-                f"Timelines:\n{json.dumps(state.get('timelines', []), indent=2)}\n\n"
-                f"Root cause:\n{json.dumps(state.get('root_cause_analysis', {}), indent=2)}\n\n"
-                "Identify early warning signals. For each: metric name, threshold, lead time, recommended alert. Valid JSON only."
-            )
-        ),
+        SystemMessage(content=signals_prompts.SYSTEM),
+        HumanMessage(content=signals_prompts.USER_TEMPLATE.format(
+            timelines=json.dumps(state.get("timelines", []), indent=2),
+            rca=json.dumps(state.get("root_cause_analysis", {}), indent=2),
+        )),
     ]
     result, record = invoke_and_log(
         llm,

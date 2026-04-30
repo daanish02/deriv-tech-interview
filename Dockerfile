@@ -38,6 +38,7 @@ COPY config.py main.py validate.py api_main.py ./
 COPY pipeline/ ./pipeline/
 COPY models/ ./models/
 COPY api/ ./api/
+COPY prompts/ ./prompts/
 
 # Install the project package itself (registers console scripts from pyproject.toml).
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -69,6 +70,7 @@ COPY --chown=appuser:appgroup config.py main.py validate.py api_main.py ./
 COPY --chown=appuser:appgroup pipeline/ ./pipeline/
 COPY --chown=appuser:appgroup models/ ./models/
 COPY --chown=appuser:appgroup api/ ./api/
+COPY --chown=appuser:appgroup prompts/ ./prompts/
 
 # Copy static input data files that the pipeline reads at runtime.
 COPY --chown=appuser:appgroup incident_a.log incident_b.log historical_incidents.json ./

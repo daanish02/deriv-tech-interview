@@ -9,12 +9,9 @@ import config
 from models.timeline import IncidentTimeline
 from pipeline.llm_client import get_structured_llm, invoke_and_log
 from pipeline.state import PipelineState
+from prompts import timeline_reconstruction as prompts
 
 logger = logging.getLogger(__name__)
-
-SYSTEM_PROMPT = """You are an SRE analyzing production incidents. Given parsed log entries, reconstruct a concise timeline.
-Classify events into phases: normal, degradation, outage, mitigation, recovery, post-incident.
-Be concise but technically precise. Include key observations."""
 
 
 def timeline_builder_node(state: PipelineState) -> dict:
@@ -34,14 +31,13 @@ def timeline_builder_node(state: PipelineState) -> dict:
     call_records = []
 
     for incident_id, entries in parsed_logs.items():
-        user_content = (
-            f"Incident ID: {incident_id}\n\n"
-            f"Parsed log entries:\n{json.dumps(entries, indent=2)}\n\n"
-            f"Incident metrics:\n{json.dumps(metrics, indent=2)}\n\n"
-            "Reconstruct a detailed incident timeline with phases and key observations."
+        user_content = prompts.USER_TEMPLATE.format(
+            incident_id=incident_id,
+            log_entries=json.dumps(entries, indent=2),
+            metrics=json.dumps(metrics, indent=2),
         )
         messages = [
-            SystemMessage(content=SYSTEM_PROMPT),
+            SystemMessage(content=prompts.SYSTEM),
             HumanMessage(content=user_content),
         ]
         result, record = invoke_and_log(

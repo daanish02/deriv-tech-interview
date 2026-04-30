@@ -118,8 +118,40 @@ def check_llm_calls() -> list[str]:
     return errors
 
 
+REQUIRED_POSTMORTEM_SECTIONS = [
+    "incident summary",
+    "timeline",
+    "root cause",
+    "contributing factors",
+    "severity classification",
+    "action items",
+    "recurrence risk",
+]
+
+
+def check_postmortem_sections() -> list[str]:
+    """Verify post-mortems contain all required sections.
+
+    Returns:
+        List of error strings for missing sections.
+    """
+    errors = []
+    for pm_file in [config.POSTMORTEM_A_FILE, config.POSTMORTEM_B_FILE]:
+        if not pm_file.exists():
+            errors.append(f"MISSING: {pm_file.name}")
+            continue
+        content = pm_file.read_text(encoding="utf-8").lower()
+        for section in REQUIRED_POSTMORTEM_SECTIONS:
+            if section not in content:
+                errors.append(f"MISSING SECTION '{section}' in {pm_file.name}")
+        # Severity classification must contain SEV1, SEV2, or SEV3
+        if "sev1" not in content and "sev2" not in content and "sev3" not in content:
+            errors.append(f"NO SEV classification (SEV1/SEV2/SEV3) in {pm_file.name}")
+    return errors
+
+
 def check_action_items() -> list[str]:
-    """Verify post-mortems contain action items with components.
+    """Verify post-mortems contain action items referencing specific components.
 
     Returns:
         List of error strings for missing action items.
@@ -128,10 +160,39 @@ def check_action_items() -> list[str]:
     for pm_file in [config.POSTMORTEM_A_FILE, config.POSTMORTEM_B_FILE]:
         if pm_file.exists():
             content = pm_file.read_text(encoding="utf-8")
-            if "action item" not in content.lower():
-                errors.append(f"NO ACTION ITEMS found in {pm_file.name}")
+            if "action items" not in content.lower():
+                errors.append(f"NO ACTION ITEMS section in {pm_file.name}")
+            # Check that action items reference specific components (table rows with |)
+            table_rows = [
+                line for line in content.splitlines()
+                if line.strip().startswith("|") and "p0" in line.lower() or
+                line.strip().startswith("|") and "p1" in line.lower() or
+                line.strip().startswith("|") and "p2" in line.lower()
+            ]
+            if not table_rows:
+                errors.append(f"NO action item table rows found in {pm_file.name}")
         else:
             errors.append(f"MISSING: {pm_file.name}")
+    return errors
+
+
+def check_communications() -> list[str]:
+    """Verify communications.md contains both user-facing and engineering sections.
+
+    Returns:
+        List of error strings for missing communications sections.
+    """
+    errors = []
+    if not config.COMMUNICATIONS_FILE.exists():
+        return ["OPTIONAL MISSING: communications.md (skipping check)"]
+    content = config.COMMUNICATIONS_FILE.read_text(encoding="utf-8").lower()
+    required = [
+        "user-facing status page update",
+        "engineering leadership retrospective summary",
+    ]
+    for section in required:
+        if section not in content:
+            errors.append(f"MISSING communications section: '{section}'")
     return errors
 
 
@@ -147,7 +208,9 @@ def main() -> int:
         ("JSON validity", check_json_valid),
         ("Both incidents processed", check_both_incidents),
         ("LLM call log", check_llm_calls),
+        ("Postmortem sections", check_postmortem_sections),
         ("Action items", check_action_items),
+        ("Communications format", check_communications),
     ]
 
     for name, check_fn in checks:
